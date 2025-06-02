@@ -94,7 +94,7 @@ def main():
     # --- User parameters ---
     root_file = 'merged.root'  # path to your ROOT file
     tree_name = 'myTree'
-    feature_branches = ['dR_TMinusKstar', 'dR_TPlusKstar', 'dR_TPlusTMinus', 'eta_B0', 'flightLength3D', 'invMassB0', 'invMassKstarTMinus', 'invMassKstarTPLus', 'invMassTT', 'pointingCos', 'vertexChi2']  # replace with your feature names
+    feature_branches = ['dR_TPlusTMinus', 'eta_B0', 'flightLength3D', 'invMassB0', 'pointingCos', 'vertexChi2']  # replace with your feature names 'vertexChi2'
     batch_size = 256
     epochs = 20
     lr = 1e-3

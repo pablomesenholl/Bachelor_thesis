@@ -4,14 +4,14 @@ import ROOT
 file = ROOT.TFile.Open("merged.root")
 file.ls()
 
-#find TTree called example
+# find TTree called example
 tree = file.Get("myTree")
-#load TTree into RDataFrame
+# load TTree into RDataFrame
 df = ROOT.RDataFrame(tree)
-#get info on dataframe
+# get info on dataframe
 df.Describe().Print()
 
-print("Number of entries in the TTree:", df.Count().GetValue())
+# print("Number of entries in the TTree:", df.Count().GetValue())
 
 # list of your three files
 files = [
@@ -19,6 +19,15 @@ files = [
     "Spec_Bckg_features.root",
     "Comb_Bckg_features.root",
 ]
+
+df1 = ROOT.RDataFrame("tree", "Signal_features.root")
+df1.Describe().Print()
+
+df2 = ROOT.RDataFrame("tree", "Spec_Bckg_features.root")
+df2.Describe().Print()
+
+df3 = ROOT.RDataFrame("tree", "Comb_Bckg_features.root")
+df3.Describe().Print()
 
 # build your chained RDataFrame
 df = ROOT.RDataFrame("tree", files)

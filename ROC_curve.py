@@ -54,10 +54,10 @@ def main():
     root_file = 'merged.root'
     tree_name = 'myTree'
     feature_branches = [
-        'dR_TMinusKstar', 'dR_TPlusKstar', 'dR_TPlusTMinus', 'eta_B0',
-        'flightLength3D', 'invMassB0', 'invMassKstarTMinus',
-        'invMassKstarTPLus', 'invMassTT', 'pointingCos', 'vertexChi2'
-    ]
+        'dR_TPlusTMinus', 'eta_B0',
+        'flightLength3D', 'invMassB0',
+        'pointingCos', 'vertexChi2'
+    ] # 'vertexChi2'
     batch_size = 256
     model_path = 'mlp_classifier.pt'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -88,8 +88,31 @@ def main():
     y_true = np.array(y_true)
     y_score = np.array(y_score)
 
-    # Binarize labels for one-vs-rest ROC
+    # plot the predicted probability distribution for signal vs other
     n_classes = 3
+    class_names = ['Signal', 'Specific Bkg', 'Comb. Bkg']
+
+    plt.figure()
+    for true_class in range(n_classes):
+        mask = (y_true == true_class)
+        plt.hist(
+            y_score[mask, 0],  # predicted P(signal) for events of this true class
+            bins=50,
+            alpha=0.5,
+            density=True,
+            label=f'True = {class_names[true_class]}'
+        )
+    plt.xlabel('Predicted Probability to be Signal')
+    plt.ylabel('Arbitrary Units')
+    plt.title('Distribution of P(signal) for Signal and Background')
+    plt.xlim(0, 1)
+    plt.yscale('log')
+    plt.legend(loc='upper center')
+    plt.grid(alpha=0.3)
+    plt.tight_layout()
+    plt.savefig('prob_dist_signal.png')
+
+    # Binarize labels for one-vs-rest ROC
     y_bin = label_binarize(y_true, classes=list(range(n_classes)))
 
     # Compute ROC curve and AUC for each class

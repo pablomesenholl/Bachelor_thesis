@@ -13,7 +13,7 @@ m_pion0 = 0.134977 #GeV
 m_Kstar = 0.89555 #GeV
 
 #load and inspect ROOT file into RDataFrame
-file = ROOT.TFile.Open("Simulation_Data.root")
+file = ROOT.TFile.Open("Simulation_Data_Smeared.root")
 file.ls()
 
 #find TTree called example
@@ -23,24 +23,12 @@ df = ROOT.RDataFrame(tree)
 #get info on dataframe
 df.Describe().Print()
 
+df.Display("m_tauPlus").Print()
+df.Display("m_tauMinus").Print()
+df.Display("m_kst").Print()
+
 print("Number of entries in the TTree:", df.Count().GetValue())
 
-
-#make function to create lorentz vectors for different masses
-def make_lv_factory(mass):
-    def make_lv(pt, eta, phi, mass):
-        return Math.PtEtaPhiMVector(pt, eta, phi, mass)
-    return make_lv
-
-# Function to define 4 vectors
-ROOT.gInterpreter.Declare(r"""
-  ROOT::Math::PtEtaPhiMVector makeTauLV(double pt, double eta, double phi) {
-    return ROOT::Math::PtEtaPhiMVector(pt,eta,phi,1.77693);
-  }
-  ROOT::Math::PtEtaPhiMVector makeKstarLV(double pt, double eta, double phi) {
-    return ROOT::Math::PtEtaPhiMVector(pt,eta,phi,0.89555);
-  }
-""")
 
 # Function to compute invariant mass from 3 FourVectors
 ROOT.gInterpreter.Declare("""
@@ -52,12 +40,10 @@ double InvariantMass3(const ROOT::Math::PtEtaPhiMVector& v1,
 """)
 
 #create 4vector for tauons and Kstar
-make_lv_tau = make_lv_factory(m_tau) #define factory for tau mass
-df = df.Define("tauPlus_lv", "makeTauLV(tauPlus_pt, tauPlus_eta, tauPlus_phi)") #adjust pt, eta, phi for correct particle
-df = df.Define("tauMinus_lv", "makeTauLV(tauMinus_pt, tauMinus_eta, tauMinus_phi)") #same here
+df = df.Define("tauPlus_lv", "ROOT::Math::PtEtaPhiMVector(tauPlus_pt, tauPlus_eta, tauPlus_phi, m_tauPlus)") #adjust pt, eta, phi for correct particle
+df = df.Define("tauMinus_lv", "ROOT::Math::PtEtaPhiMVector(tauMinus_pt, tauMinus_eta, tauMinus_phi, m_tauMinus)") #same here
 
-make_lv_Kstar = make_lv_factory(m_Kstar) #define factory for Kstar mass
-df = df.Define("Kstar_lv", "makeKstarLV(kst_pt, kst_eta, kst_phi)") #adjust pt, eta, phi for Kstar
+df = df.Define("Kstar_lv", "ROOT::Math::PtEtaPhiMVector(kst_pt, kst_eta, kst_phi, m_kst)") #adjust pt, eta, phi for Kstar
 
 #compute invariant mass of B^0 with 3 tracks from Kstar tau tau
 df = df.Define("invMassB0",
@@ -66,7 +52,7 @@ df = df.Define("invMassB0",
 
 #compute invariant masses of TT, KstarT-, KstarT+ with 2 tracks
 df = df.Define("invMassTT", "ROOT::Math::VectorUtil::InvariantMass(tauPlus_lv, tauMinus_lv)") #mTT
-df = df.Define("invMassKstarTPLus", "ROOT::Math::VectorUtil::InvariantMass(tauPlus_lv, Kstar_lv)") #mT+Kstar
+df = df.Define("invMassKstarTPlus", "ROOT::Math::VectorUtil::InvariantMass(tauPlus_lv, Kstar_lv)") #mT+Kstar
 df = df.Define("invMassKstarTMinus", "ROOT::Math::VectorUtil::InvariantMass(tauMinus_lv, Kstar_lv)") #mT-Kstar
 
 #B^0 candidate kinematics (if not in data yet)
@@ -103,19 +89,25 @@ df = df.Define("pointingCos",
 #add the type of signal/background label to the df for the classifier
 df = df.Define("label", "0")
 
+all_cols = list(df.GetColumnNames())     # correct feature names
+for old in ("mT_tautau", "m_tautau_coll", "etaB", "phiB", "ptB"):
+    all_cols.remove(old)
+
 #save the full RDataFrame in a new root file
-df.Snapshot("tree", "Signal_features.root")
+df.Snapshot("tree", "Signal_features.root", all_cols)
 
 #Now do a bunch of histos to check if simulation went correctly
-mass_B0_h = df.Histo1D(("mass_B0_histo", "B0 Mass distribution", 100, 3, 10), "invMassB0")
-mass_TT_h = df.Histo1D(("mass_TT_histo", "TT Mass distribution", 100, 3, 5), "invMassTT")
+pt_tauPlus_h = df.Histo1D(("pt_tauPlus_histo", "tau plus pt distribution", 100, 0, 8), "tauPlus_pt")
+mass_B0_h = df.Histo1D(("mass_B0_histo", "B0 Mass distribution", 100, 1, 5), "invMassB0")
+mass_TT_h = df.Histo1D(("mass_TT_histo", "TT Mass distribution", 100, 0, 4), "invMassTT")
 eta_B0_h = df.Histo1D(("eta_B0_histo", "B0 eta distribution", 100, -10, 10), "eta_B0")
 eta_TPLus_h = df.Histo1D(("eta_TPLus_histo", "TPlus eta distribution", 100, -10, 10), "tauPlus_eta")
 phi_B0_h = df.Histo1D(("phi_B0_histo", "B0 phi distribution", 100, -np.pi, np.pi), "phi_B0")
 pt_B0_h = df.Histo1D(("pt_B0_histo", "B0 pt distribution", 100, 0, 10), "pt_B0")
 VertexChi2_h = df.Histo1D(("VertexChi2_histo", "VertexChi2 distribution", 100, 0, 20), "vertexChi2")
-pointingCos_h = df.Histo1D(("PointingCos_histo", "PointingCos distribution", 100, -np.pi, np.pi), "pointingCos")
+pointingCos_h = df.Histo1D(("PointingCos_histo", "PointingCos distribution", 100, -1, 1), "pointingCos")
 flightLength_h = df.Histo1D(("flightLength_histo", "flightLength distribution", 100, 0, 100), "flightLength3D")
+mT_tautau_h = df.Histo1D(("transverse_mass_ditau_histo", "trans. mass di-tau distribution", 100, 0, 5), "mT_tautau")
 
 #save histograms
 c = ROOT.TCanvas()
@@ -162,3 +154,13 @@ c = ROOT.TCanvas()
 flightLength_h.Draw()
 c.Update()
 c.SaveAs("Plots_Signal_Simulation/flightLength distribution.png")
+
+c = ROOT.TCanvas()
+pt_tauPlus_h.Draw()
+c.Update()
+c.SaveAs("Plots_Signal_Simulation/tau plus pt distribution.png")
+
+c = ROOT.TCanvas()
+mT_tautau_h.Draw()
+c.Update()
+c.SaveAs("Plots_Signal_Simulation/mT di-tau distribution.png")
