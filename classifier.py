@@ -32,7 +32,7 @@ class RootFeatureDataset(Dataset):
 
 
 class MLPClassifier(nn.Module):
-    def __init__(self, input_dim, hidden_dims=[64, 32], output_dim=3):
+    def __init__(self, input_dim, hidden_dims=[64, 32, 16], output_dim=3):
         super().__init__()
         layers = []
         prev_dim = input_dim
@@ -94,9 +94,9 @@ def main():
     # --- User parameters ---
     root_file = 'merged.root'  # path to your ROOT file
     tree_name = 'myTree'
-    feature_branches = ['dR_TPlusTMinus', 'eta_B0', 'flightLength3D', 'invMassB0', 'pointingCos', 'vertexChi2']  # replace with your feature names 'vertexChi2'
+    feature_branches = ['dR_TPlusKstar', 'eta_B0', 'invMassB0', 'invMassTT', 'invMassKstarTPlus', 'invMassKstarTMinus', 'pt_B0', 'pointingCos', 'transFlightLength', 'vertexChi2']  # replace with your feature names 'vertexChi2'
     batch_size = 256
-    epochs = 20
+    epochs = 30
     lr = 1e-3
 
     # --- Setup ---

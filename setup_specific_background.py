@@ -79,6 +79,11 @@ df = df.Define("pointingCos",
 
 #VertexChi2 should be a standalone feature already implemented
 
+#Transverse Flight Length of the B0
+df = df.Define("transFlightLength", "sqrt(Lx*Lx + Ly*Ly)")
+
+#reconstructed proper tau of the B meson in xy plane
+df = df.Define("B0_t_xy", "(transFlightLength * invMassB0)/pt_B0")
 
 #NEXT: implement helicity angle
 
@@ -102,8 +107,14 @@ phi_B0_h = df.Histo1D(("phi_B0_histo", "B0 phi distribution", 100, -1, 1), "phi_
 pt_B0_h = df.Histo1D(("pt_B0_histo", "B0 pt distribution", 100, 0, 11), "pt_B0")
 VertexChi2_h = df.Histo1D(("VertexChi2_histo", "VertexChi2 distribution", 100, 0, 4), "vertexChi2")
 eta_Kstar_h = df.Histo1D(("eta_Kstar_histo", "Kstar eta distribution", 100, -10, 10), "kst_eta")
-pointingCos_h = df.Histo1D(("PointingCos_histo", "PointingCos distribution", 100, -np.pi, np.pi), "pointingCos")
+pointingCos_h = df.Histo1D(("PointingCos_histo", "PointingCos distribution", 100, -1, 1), "pointingCos")
 flightLength_h = df.Histo1D(("flightLength_histo", "flightLength distribution", 100, 0, 40), "flightLength3D")
+m_kst_h = df.Histo1D(("Kstar inv mass histo", "Kstar inv mass distribution", 100, 0, 2), "m_kst")
+B0_t_h = df.Histo1D(("B0 proper time histo", "B0 proper time distribution", 100, 0, 3), "B0_t")
+Lxy_h = df.Histo1D(("B0 transverse flight lenght histo", "B0 trans. flight length distribution", 100, 0, 4), "transFlightLength")
+B0_t_xy = df.Histo1D(("B0 proper transverse time histo", "B0 trans. proper time distribution", 100, 0, 3), "B0_t_xy")
+mass_Kst_TPlus_h = df.Histo1D(("Kst TPlus inv mass histo", "inv mass Kst TPlus distribution", 100, 0, 5), "invMassKstarTPlus")
+mass_Kst_TMinus_h = df.Histo1D(("Kst TMinus inv mass histo", "inv mass Kst TMinus distribution", 100, 0, 5), "invMassKstarTMinus")
 
 
 #save histograms
@@ -156,3 +167,38 @@ c = ROOT.TCanvas()
 flightLength_h.Draw()
 c.Update()
 c.SaveAs("Plots_spec_bckg_simulation/flightLength distribution.png")
+
+c = ROOT.TCanvas()
+m_kst_h.Draw()
+c.Update()
+c.SaveAs("Plots_spec_bckg_simulation/m_kst distribution.png")
+
+c = ROOT.TCanvas()
+m_kst_h.Draw()
+c.Update()
+c.SaveAs("Plots_spec_bckg_simulation/m_kst distribution.png")
+
+c = ROOT.TCanvas()
+B0_t_h.Draw()
+c.Update()
+c.SaveAs("Plots_spec_bckg_simulation/B0_t distribution.png")
+
+c = ROOT.TCanvas()
+Lxy_h.Draw()
+c.Update()
+c.SaveAs("Plots_spec_bckg_simulation/Lxy distribution.png")
+
+c = ROOT.TCanvas()
+B0_t_xy.Draw()
+c.Update()
+c.SaveAs("Plots_spec_bckg_simulation/B0 t_xy distribution.png")
+
+c = ROOT.TCanvas()
+mass_Kst_TPlus_h.Draw()
+c.Update()
+c.SaveAs("Plots_spec_bckg_simulation/Kst TPlus mass distribution.png")
+
+c = ROOT.TCanvas()
+mass_Kst_TMinus_h.Draw()
+c.Update()
+c.SaveAs("Plots_spec_bckg_simulation/Kst TMinus mass distribution.png")

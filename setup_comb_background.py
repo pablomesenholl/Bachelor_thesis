@@ -90,6 +90,11 @@ df = df.Define("pointingCos",
 
 #VertexChi2 should be a standalone feature already implemented
 
+#Transverse Flight Length of the B0
+df = df.Define("transFlightLength", "sqrt(Lx*Lx + Ly*Ly)")
+
+#reconstructed proper tau of the B meson in xy plane
+df = df.Define("B0_t_xy", "(transFlightLength * invMassB0)/pt_B0")
 
 #NEXT: implement helicity angle
 
@@ -116,6 +121,7 @@ eta_Kstar_h = df.Histo1D(("eta_Kstar_histo", "Kstar eta distribution", 100, -10,
 eta_T3_h = df.Histo1D(("eta_T3_histo", "3prong eta distribution", 100, -10, 10), "tau3_eta")
 pointingCos_h = df.Histo1D(("PointingCos_histo", "PointingCos distribution", 100, -1, 1), "pointingCos")
 flightLength_h = df.Histo1D(("flightLength_histo", "flightLength distribution", 100, 0, 100), "flightLength3D")
+m_kst_h = df.Histo1D(("Kstar inv mass histo", "Kstar inv mass distribution", 100, 0, 8), "m_kst")
 
 
 #save histograms
@@ -173,3 +179,8 @@ c = ROOT.TCanvas()
 flightLength_h.Draw()
 c.Update()
 c.SaveAs("Plots_comb_bckg_simulation/flightLength distribution.png")
+
+c = ROOT.TCanvas()
+m_kst_h.Draw()
+c.Update()
+c.SaveAs("Plots_comb_bckg_simulation/m_kst distribution.png")

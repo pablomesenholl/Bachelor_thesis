@@ -34,7 +34,7 @@ class RootFeatureDataset(Dataset):
 
 # --- Model Definition ---
 class MLPClassifier(nn.Module):
-    def __init__(self, input_dim, hidden_dims=[64, 32], output_dim=3):
+    def __init__(self, input_dim, hidden_dims=[64, 32, 16], output_dim=3):
         super().__init__()
         layers = []
         prev_dim = input_dim
@@ -54,9 +54,7 @@ def main():
     root_file = 'merged.root'
     tree_name = 'myTree'
     feature_branches = [
-        'dR_TPlusTMinus', 'eta_B0',
-        'flightLength3D', 'invMassB0',
-        'pointingCos', 'vertexChi2'
+        'dR_TPlusKstar', 'eta_B0', 'invMassB0', 'invMassTT', 'invMassKstarTPlus', 'invMassKstarTMinus', 'pt_B0', 'pointingCos', 'transFlightLength', 'vertexChi2'
     ] # 'vertexChi2'
     batch_size = 256
     model_path = 'mlp_classifier.pt'
@@ -91,6 +89,18 @@ def main():
     # plot the predicted probability distribution for signal vs other
     n_classes = 3
     class_names = ['Signal', 'Specific Bkg', 'Comb. Bkg']
+
+    #compute efficiency
+    signal_mask = (y_true == 0)
+    bckg_mask = (y_true == 1) | (y_true == 2)
+    cut_value = 0.9
+    n_sig_total = np.sum(signal_mask)
+    n_sig_pass = np.sum(y_score[signal_mask, 0] > cut_value)
+    epsilon_sig = n_sig_pass / n_sig_total
+    n_bckg_total = np.sum(bckg_mask)
+    n_bckg_pass = np.sum(y_score[bckg_mask, 0] > cut_value)
+    epsilon_bckg = n_bckg_pass / n_bckg_total
+    print("Selection efficiency of signal vs. background at P(signal)>0.9: efficiency signal = ", epsilon_sig, "efficiency background = ", epsilon_bckg)
 
     plt.figure()
     for true_class in range(n_classes):
