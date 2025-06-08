@@ -32,13 +32,14 @@ class RootFeatureDataset(Dataset):
 
 
 class MLPClassifier(nn.Module):
-    def __init__(self, input_dim, hidden_dims=[64, 32, 16], output_dim=3):
+    def __init__(self, input_dim, hidden_dims=[64, 32, 16], output_dim=3, dropout_prob=0.3):
         super().__init__()
         layers = []
         prev_dim = input_dim
         for h in hidden_dims:
             layers.append(nn.Linear(prev_dim, h))
             layers.append(nn.ReLU())
+            # layers.append(nn.Dropout(dropout_prob))
             prev_dim = h
         layers.append(nn.Linear(prev_dim, output_dim))
         self.net = nn.Sequential(*layers)
@@ -94,7 +95,7 @@ def main():
     # --- User parameters ---
     root_file = 'merged.root'  # path to your ROOT file
     tree_name = 'myTree'
-    feature_branches = ['dR_TPlusKstar', 'eta_B0', 'invMassB0', 'invMassTT', 'invMassKstarTPlus', 'invMassKstarTMinus', 'pt_B0', 'pointingCos', 'transFlightLength', 'vertexChi2']  # replace with your feature names 'vertexChi2'
+    feature_branches = ['dR_TPlusKstar', 'dR_TMinusKstar', 'dR_TPlusTMinus', 'm_kst', 'invMassB0', 'invMassTT', 'invMassKstarTPlus', 'invMassKstarTMinus', 'pt_B0', 'pointingCos', 'transFlightLength', 'vertexChi2', 'eta_B0']  # replace with your feature names 'vertexChi2'
     batch_size = 256
     epochs = 30
     lr = 1e-3
@@ -125,7 +126,7 @@ def main():
 
     model = MLPClassifier(input_dim=len(feature_branches)).to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
 
     # --- Training loop ---
     for epoch in range(1, epochs + 1):

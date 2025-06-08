@@ -34,13 +34,14 @@ class RootFeatureDataset(Dataset):
 
 # --- Model Definition ---
 class MLPClassifier(nn.Module):
-    def __init__(self, input_dim, hidden_dims=[64, 32, 16], output_dim=3):
+    def __init__(self, input_dim, hidden_dims=[128, 64, 32], output_dim=3, dropout_prob = 0.2):
         super().__init__()
         layers = []
         prev_dim = input_dim
         for h in hidden_dims:
             layers.append(nn.Linear(prev_dim, h))
             layers.append(nn.ReLU())
+            layers.append(nn.Dropout(dropout_prob))
             prev_dim = h
         layers.append(nn.Linear(prev_dim, output_dim))
         self.net = nn.Sequential(*layers)
@@ -54,10 +55,10 @@ def main():
     root_file = 'merged.root'
     tree_name = 'myTree'
     feature_branches = [
-        'dR_TPlusKstar', 'eta_B0', 'invMassB0', 'invMassTT', 'invMassKstarTPlus', 'invMassKstarTMinus', 'pt_B0', 'pointingCos', 'transFlightLength', 'vertexChi2'
+        'dR_TPlusKstar', 'dR_TMinusKstar', 'dR_TPlusTMinus', 'm_kst', 'invMassB0', 'invMassTT', 'invMassKstarTPlus', 'invMassKstarTMinus', 'pt_B0', 'pointingCos', 'transFlightLength', 'vertexChi2', 'eta_B0'
     ] # 'vertexChi2'
-    batch_size = 256
-    model_path = 'mlp_classifier.pt'
+    batch_size = 128
+    model_path = 'mlp_best.pt'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Load dataset and DataLoader
@@ -93,14 +94,55 @@ def main():
     #compute efficiency
     signal_mask = (y_true == 0)
     bckg_mask = (y_true == 1) | (y_true == 2)
-    cut_value = 0.9
+    cut_value = 0.960
     n_sig_total = np.sum(signal_mask)
     n_sig_pass = np.sum(y_score[signal_mask, 0] > cut_value)
     epsilon_sig = n_sig_pass / n_sig_total
     n_bckg_total = np.sum(bckg_mask)
     n_bckg_pass = np.sum(y_score[bckg_mask, 0] > cut_value)
     epsilon_bckg = n_bckg_pass / n_bckg_total
-    print("Selection efficiency of signal vs. background at P(signal)>0.9: efficiency signal = ", epsilon_sig, "efficiency background = ", epsilon_bckg)
+
+    cut_value_array = np.linspace(0, 1, 100)
+    def efficiency(cuts):
+        eff_sig = []
+        eff_bckg = []
+        for cut in cuts:
+            eff_sig.append(np.sum(y_score[signal_mask, 0] > cut) / n_sig_total)
+            eff_bckg.append(np.sum(y_score[bckg_mask, 0] > cut) / n_bckg_total)
+        return np.array(eff_sig), np.array(eff_bckg)
+
+    eff, eff_bckg = efficiency(cut_value_array)
+
+    #compute significance array
+    signif = []
+    for cut in cut_value_array:
+        n_sig_pass = np.sum(y_score[signal_mask, 0] > cut)
+        n_bkg_pass = np.sum(y_score[bckg_mask, 0] > cut)
+        if n_bkg_pass > 0:
+            signif.append(n_sig_pass / np.sqrt(n_bkg_pass))
+        else:
+            signif.append(0.) #no division by 0
+    signif = np.array(signif)
+
+    #find maximum significance cut
+    idx_opt = np.argmax(signif)
+    opt_cut = cut_value_array[idx_opt]
+    opt_s = np.sum(y_score[signal_mask, 0] > opt_cut)
+    opt_b = np.sum(y_score[bckg_mask, 0] > opt_cut)
+    print(f"Optimal cut by S/√B = {opt_cut:.3f}")
+    print(f"  -> S = {opt_s}, B = {opt_b}, S/√B = {signif[idx_opt]:.3f}")
+
+    plt.figure()
+    plt.plot(cut_value_array, eff, label="Signal Efficiency")
+    plt.plot(cut_value_array, eff_bckg, label="Background Efficiency")
+    plt.scatter(opt_cut, opt_s / n_sig_total, color='red', label=f"S/√B-opt cut={opt_cut:.2f}")
+    plt.ylabel("Efficiency")
+    plt.xlabel("Cut value")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig("efficiency_plot.png")
+
+    print("Selection efficiency of signal vs. background at P(signal)>0.960: efficiency signal = ", epsilon_sig, "efficiency background = ", epsilon_bckg)
 
     plt.figure()
     for true_class in range(n_classes):
@@ -151,8 +193,8 @@ def main():
     colors = ['navy', 'darkorange', 'green']
     for i, color in zip(range(n_classes), colors):
         plt.plot(fpr[i], tpr[i], label=f"Class {i} (AUC = {roc_auc[i]:.2f})", linewidth=2)
-    plt.plot(fpr['micro'], tpr['micro'], label=f"Micro-avg (AUC = {roc_auc['micro']:.2f})", linestyle=':')
-    plt.plot(fpr['macro'], tpr['macro'], label=f"Macro-avg (AUC = {roc_auc['macro']:.2f})", linestyle='--')
+    # plt.plot(fpr['micro'], tpr['micro'], label=f"Micro-avg (AUC = {roc_auc['micro']:.2f})", linestyle=':')
+    # plt.plot(fpr['macro'], tpr['macro'], label=f"Macro-avg (AUC = {roc_auc['macro']:.2f})", linestyle='--')
     plt.plot([0, 1], [0, 1], 'k--', label='Chance (AUC = 0.50)')
     plt.xlim([-0.01, 1.01])
     plt.ylim([-0.01, 1.01])
