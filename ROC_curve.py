@@ -49,6 +49,17 @@ class MLPClassifier(nn.Module):
     def forward(self, x):
         return self.net(x)
 
+def bayes_reweight(p_flat, true_priors):
+    """
+    p_flat: Tensor [batch,3] from softmax(logits)
+    true_priors: list or 1D-tensor [P_sig, P_spec, P_comb]
+    returns: Tensor [batch,3] p_true(c|x)
+    """
+    # make priors a tensor on the right device
+    prior = torch.tensor(true_priors, device=p_flat.device).unsqueeze(0)  # shape [1,3]
+    unnorm = p_flat * prior            # broadcast → [batch,3]
+    return unnorm / unnorm.sum(dim=1, keepdim=True)  # normalize rows
+
 # --- Main Evaluation and ROC Plotting ---
 def main():
     # Parameters
@@ -58,7 +69,7 @@ def main():
         'dR_TPlusKstar', 'dR_TMinusKstar', 'dR_TPlusTMinus', 'm_kst', 'invMassB0', 'invMassTT', 'invMassKstarTPlus', 'invMassKstarTMinus', 'pt_B0', 'pointingCos', 'transFlightLength', 'vertexChi2', 'eta_B0'
     ] # 'vertexChi2'
     batch_size = 128
-    model_path = 'mlp_best.pt'
+    model_path = 'mlp_classifier.pt'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Load dataset and DataLoader
@@ -74,6 +85,9 @@ def main():
     model.load_state_dict(state)
     model.eval()
 
+    # true prior proportions between classes, need to be adjusted
+    true_priors = [1e-7, 0.1, 0.9]
+
     # Gather true labels and scores
     y_true = []
     y_score = []
@@ -82,10 +96,15 @@ def main():
             X = X.to(device)
             logits = model(X)
             probs = torch.softmax(logits, dim=1)
+            p_true = bayes_reweight(probs, true_priors)
             y_true.extend(y.numpy())
             y_score.extend(probs.cpu().numpy())
     y_true = np.array(y_true)
     y_score = np.array(y_score)
+
+    #build weights based on the actual proportions of signal and background classes
+    W_sig, W_spec, W_comb = true_priors
+    weights = np.where(y_true == 0, W_sig, np.where(y_true == 1, W_spec, W_comb))
 
     # plot the predicted probability distribution for signal vs other
     n_classes = 3
@@ -94,7 +113,7 @@ def main():
     #compute efficiency
     signal_mask = (y_true == 0)
     bckg_mask = (y_true == 1) | (y_true == 2)
-    cut_value = 0.960
+    cut_value = 0.997
     n_sig_total = np.sum(signal_mask)
     n_sig_pass = np.sum(y_score[signal_mask, 0] > cut_value)
     epsilon_sig = n_sig_pass / n_sig_total
@@ -102,7 +121,7 @@ def main():
     n_bckg_pass = np.sum(y_score[bckg_mask, 0] > cut_value)
     epsilon_bckg = n_bckg_pass / n_bckg_total
 
-    cut_value_array = np.linspace(0, 1, 100)
+    cut_value_array = np.linspace(0, 1, 1000)
     def efficiency(cuts):
         eff_sig = []
         eff_bckg = []
@@ -116,33 +135,36 @@ def main():
     #compute significance array
     signif = []
     for cut in cut_value_array:
-        n_sig_pass = np.sum(y_score[signal_mask, 0] > cut)
-        n_bkg_pass = np.sum(y_score[bckg_mask, 0] > cut)
-        if n_bkg_pass > 0:
-            signif.append(n_sig_pass / np.sqrt(n_bkg_pass))
-        else:
-            signif.append(0.) #no division by 0
+        # boolean masks
+        pass_sig  = (y_score[:,0] > cut) & (y_true == 0)
+        pass_bkg  = (y_score[:,0] > cut) & (y_true > 0)
+        # unweighted sums
+        S = np.sum(pass_sig)
+        B = np.sum(pass_bkg)
+        signif.append(S/np.sqrt(B) if (B>0) else 0.0) #compute significance, protect against div by 0
     signif = np.array(signif)
 
     #find maximum significance cut
     idx_opt = np.argmax(signif)
     opt_cut = cut_value_array[idx_opt]
-    opt_s = np.sum(y_score[signal_mask, 0] > opt_cut)
-    opt_b = np.sum(y_score[bckg_mask, 0] > opt_cut)
+    pass_sig_opt = (y_score[:, 0] > opt_cut) & (y_true == 0)
+    pass_bkg_opt = (y_score[:, 0] > opt_cut) & (y_true > 0)
+    # S_opt = np.sum(weights[pass_sig_opt])
+    # B_opt = np.sum(weights[pass_bkg_opt])
     print(f"Optimal cut by S/√B = {opt_cut:.3f}")
-    print(f"  -> S = {opt_s}, B = {opt_b}, S/√B = {signif[idx_opt]:.3f}")
+    # print(f"  -> S = {S_opt}, B = {B_opt}, S/√B = {signif[idx_opt]:.3f}")
 
     plt.figure()
     plt.plot(cut_value_array, eff, label="Signal Efficiency")
     plt.plot(cut_value_array, eff_bckg, label="Background Efficiency")
-    plt.scatter(opt_cut, opt_s / n_sig_total, color='red', label=f"S/√B-opt cut={opt_cut:.2f}")
+    plt.scatter(opt_cut, eff[idx_opt], color='red', label=f"S/√B-opt cut={opt_cut:.3f}")
     plt.ylabel("Efficiency")
     plt.xlabel("Cut value")
     plt.legend()
     plt.grid(True)
     plt.savefig("efficiency_plot.png")
 
-    print("Selection efficiency of signal vs. background at P(signal)>0.960: efficiency signal = ", epsilon_sig, "efficiency background = ", epsilon_bckg)
+    print("Selection efficiency of signal vs. background at P(signal)>0.997: efficiency signal = ", epsilon_sig, "efficiency background = ", epsilon_bckg)
 
     plt.figure()
     for true_class in range(n_classes):

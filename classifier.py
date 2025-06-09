@@ -32,14 +32,14 @@ class RootFeatureDataset(Dataset):
 
 
 class MLPClassifier(nn.Module):
-    def __init__(self, input_dim, hidden_dims=[64, 32, 16], output_dim=3, dropout_prob=0.3):
+    def __init__(self, input_dim, hidden_dims=[128, 64, 32], output_dim=3, dropout_prob=0.2):
         super().__init__()
         layers = []
         prev_dim = input_dim
         for h in hidden_dims:
             layers.append(nn.Linear(prev_dim, h))
             layers.append(nn.ReLU())
-            # layers.append(nn.Dropout(dropout_prob))
+            layers.append(nn.Dropout(dropout_prob))
             prev_dim = h
         layers.append(nn.Linear(prev_dim, output_dim))
         self.net = nn.Sequential(*layers)
@@ -96,7 +96,7 @@ def main():
     root_file = 'merged.root'  # path to your ROOT file
     tree_name = 'myTree'
     feature_branches = ['dR_TPlusKstar', 'dR_TMinusKstar', 'dR_TPlusTMinus', 'm_kst', 'invMassB0', 'invMassTT', 'invMassKstarTPlus', 'invMassKstarTMinus', 'pt_B0', 'pointingCos', 'transFlightLength', 'vertexChi2', 'eta_B0']  # replace with your feature names 'vertexChi2'
-    batch_size = 256
+    batch_size = 128
     epochs = 30
     lr = 1e-3
 
@@ -112,7 +112,15 @@ def main():
     print(f"  signal (0):                {counts.get(0,0)}")
     print(f"  specific background (1):   {counts.get(1,0)}")
     print(f"  combinatorial background (2): {counts.get(2,0)}")
-    
+
+    #introduce weights to make all classes equally large
+    flat_weights = torch.tensor([
+        1.0 / counts[0],
+        1.0 / counts[1],
+        1.0 / counts[2]
+    ], dtype=torch.float32)
+    flat_weights /= flat_weights.sum() #normalization
+
     # Split train / val
     n = len(dataset)
     idx = np.random.permutation(n)
@@ -125,7 +133,7 @@ def main():
     val_loader = DataLoader(val_ds, batch_size=batch_size)
 
     model = MLPClassifier(input_dim=len(feature_branches)).to(device)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weight=flat_weights)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
 
     # --- Training loop ---

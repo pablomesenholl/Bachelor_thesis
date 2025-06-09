@@ -489,8 +489,8 @@ Lxy_spec_h.SetLineColor(kBlue)
 Lxy_comb_h.SetLineColor(kRed)
 
 c = ROOT.TCanvas()
-Lxy_sign_h.Draw("HIST")
-Lxy_comb_h.Draw("HIST SAME")
+Lxy_comb_h.Draw("HIST")
+Lxy_sign_h.Draw("HIST SAME")
 Lxy_spec_h.Draw("HIST SAME")
 
 
@@ -500,5 +500,6 @@ leg.AddEntry(Lxy_spec_h, "spec bckg", "l")
 leg.AddEntry(Lxy_comb_h, "comb bckg", "l")
 leg.Draw()
 
+c.SetLogy()
 c.Update()
 c.SaveAs("Overlay_histos/Lxy distr overlay.png")
