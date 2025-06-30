@@ -13,7 +13,7 @@ m_pion0 = 0.134977 #GeV
 m_Kstar = 0.89555 #GeV
 
 #load and inspect ROOT file into RDataFrame
-file = ROOT.TFile.Open("Specific_Background_Smeared.root")
+file = ROOT.TFile.Open("Specific_Background_Final.root")
 file.ls()
 
 #find TTree called example
@@ -87,8 +87,37 @@ df = df.Define("B0_t_xy", "(transFlightLength * invMassB0)/pt_B0")
 
 #NEXT: implement helicity angle
 
+#Do trigger filtering of muons and compute trigger efficiency
+nTotal = df.Count().GetValue()
+twenty18 = df.Filter("TMath::Abs(mu_eta) < 1.5 && mu_pt > 9 && IP_mu < 6", "2018_trigger")
+twenty22 = df.Filter("TMath::Abs(mu_eta) < 1.5 && mu_pt > 12 && IP_mu < 6", "2022_trigger")
+twenty24 = df.Filter("TMath::Abs(mu_eta) < 0.83 && mu_pt > 10 && IP_mu < 6", "2024_trigger")
+twenty25_1 = df.Filter("TMath::Abs(mu_eta) < 0.83 && mu_pt > 10 && IP_mu < 4", "2025_trigger_1")
+twenty25_2 = df.Filter("TMath::Abs(mu_eta) < 0.83 && mu_pt > 9 && IP_mu < 6", "2025_trigger_2")
+twenty25_3 = df.Filter("TMath::Abs(mu_eta) < 0.83 && mu_pt > 5 && IP_mu < 4", "2025_trigger_3")
+n2018 = twenty18.Count().GetValue()
+eff2018 = n2018 / nTotal
+n2022 = twenty22.Count().GetValue()
+eff2022 = n2022 / nTotal
+n2024 = twenty24.Count().GetValue()
+eff2024 = n2024 / nTotal
+n2025_1 = twenty25_1.Count().GetValue()
+eff2025_1 = n2025_1 / nTotal
+n2025_2 = twenty25_2.Count().GetValue()
+eff2025_2 = n2025_2 / nTotal
+n2025_3 = twenty25_3.Count().GetValue()
+eff2025_3 = n2025_3 / nTotal
+print(f"2018 trigger: {n2018}/{nTotal} = {eff2018}")
+print(f"2022 trigger: {n2022}/{nTotal} = {eff2022}")
+print(f"2024 trigger: {n2024}/{nTotal} = {eff2024}")
+print(f"2025 trigger 1: {n2025_1}/{nTotal} = {eff2025_1}")
+print(f"2025 trigger 2: {n2025_2}/{nTotal} = {eff2025_2}")
+print(f"2025 trigger 3: {n2025_3}/{nTotal} = {eff2025_3}")
+
+
 #add the type of signal/background label to the df for the classifier
 df = df.Define("label", "1")
+df = df.Filter("TMath::Abs(mu_eta) < 0.83 && mu_pt > 5 && IP_mu < 4", "2025_trigger_3")
 
 
 all_cols = list(df.GetColumnNames())     # correct feature names
@@ -96,7 +125,7 @@ for old in ("etaB", "phiB", "ptB"):
     all_cols.remove(old)
 
 #save the full RDataFrame in a new root file
-df.Snapshot("tree", "Spec_Bckg_features.root", all_cols)
+df.Snapshot("tree", "Spec_Bckg_features_triggered.root", all_cols)
 
 #Now do a bunch of histos to check if simulation went correctly
 mass_B0_h = df.Histo1D(("mass_B0_histo", "B0 Mass distribution", 100, 1, 5), "invMassB0")
@@ -115,6 +144,9 @@ Lxy_h = df.Histo1D(("B0 transverse flight lenght histo", "B0 trans. flight lengt
 B0_t_xy = df.Histo1D(("B0 proper transverse time histo", "B0 trans. proper time distribution", 100, 0, 3), "B0_t_xy")
 mass_Kst_TPlus_h = df.Histo1D(("Kst TPlus inv mass histo", "inv mass Kst TPlus distribution", 100, 0, 5), "invMassKstarTPlus")
 mass_Kst_TMinus_h = df.Histo1D(("Kst TMinus inv mass histo", "inv mass Kst TMinus distribution", 100, 0, 5), "invMassKstarTMinus")
+IP_h = df.Histo1D(("IP muon histo", "IP muon distribution", 100, 0, 10), "IP_mu")
+muon_pt_h = df.Histo1D(("pt muon histo", "Muon pt distribution", 100, 0, 10), "mu_pt")
+muon_eta_h = df.Histo1D(("eta muon histo", "Muon eta distribution", 100, -2.5, 2.5), "mu_eta")
 
 
 #save histograms
@@ -202,3 +234,18 @@ c = ROOT.TCanvas()
 mass_Kst_TMinus_h.Draw()
 c.Update()
 c.SaveAs("Plots_spec_bckg_simulation/Kst TMinus mass distribution.png")
+
+c = ROOT.TCanvas()
+IP_h.Draw()
+c.Update()
+c.SaveAs("Plots_spec_bckg_simulation/IP muon distribution.png")
+
+c = ROOT.TCanvas()
+muon_pt_h.Draw()
+c.Update()
+c.SaveAs("Plots_spec_bckg_simulation/Muon pt distribution.png")
+
+c = ROOT.TCanvas()
+muon_eta_h.Draw()
+c.Update()
+c.SaveAs("Plots_spec_bckg_simulation/Muon eta distribution.png")

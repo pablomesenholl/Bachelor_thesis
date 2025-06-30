@@ -100,13 +100,20 @@ def cross_validate(dataset, hyperparams, n_splits=5):
         train_loader = DataLoader(train_ds, batch_size=hyperparams['batch_size'], shuffle=True)
         val_loader   = DataLoader(val_ds, batch_size=hyperparams['batch_size'])
 
+        #compute flat weights
+        train_labels = np.array([dataset.labels[i] for i in train_idx])
+        counts = np.bincount(train_labels, minlength=3).astype(np.float32)
+        flat_weights = 1.0 / counts
+        flat_weights = flat_weights / flat_weights.sum()
+        class_weights = torch.from_numpy(flat_weights).to(device)
+
         model = MLPClassifier(
             input_dim=X.shape[1],
             hidden_dims=hyperparams['hidden_dims'],
             output_dim=len(np.unique(y)),
             dropout_prob=hyperparams['dropout_prob']
         ).to(device)
-        criterion = nn.CrossEntropyLoss()
+        criterion = nn.CrossEntropyLoss(weight = class_weights)
         optimizer = torch.optim.Adam(
             model.parameters(), lr=hyperparams['lr'], weight_decay=hyperparams['weight_decay']
         )
@@ -127,8 +134,8 @@ def grid_search(root_file, tree_name, feature_branches):
 
     # Define hyperparameter grid
     param_grid = {
-        'hidden_dims': [[32,16], [64,32,16], [128,64,32]],
-        'dropout_prob': [0.2, 0.5],
+        'hidden_dims': [[64,32,16], [128,64,32]],
+        'dropout_prob': [0.1, 0.2],
         'lr': [1e-3, 1e-4],
         'weight_decay': [1e-4, 1e-5],
         'batch_size': [128, 256],
@@ -156,13 +163,19 @@ def train_final(root_file, tree_name, feature_branches, best_params):
     loader = DataLoader(dataset, batch_size=best_params['batch_size'], shuffle=True)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    #compute flat weights
+    counts = np.bincount(dataset.labels, minlength=3).astype(np.float32)
+    flat_weights = 1.0 / counts
+    flat_weights = flat_weights / flat_weights.sum()
+    class_weights = torch.from_numpy(flat_weights).to(device)
+
     model = MLPClassifier(
         input_dim=dataset.features.shape[1],
         hidden_dims=best_params['hidden_dims'],
         output_dim=len(np.unique(dataset.labels)),
         dropout_prob=best_params['dropout_prob']
     ).to(device)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = torch.optim.Adam(
         model.parameters(), lr=best_params['lr'], weight_decay=best_params['weight_decay']
     )
@@ -179,12 +192,7 @@ if __name__ == '__main__':
     root_file = 'merged.root'
     tree_name  = 'myTree'
     feature_branches = [
-        'dR_TPlusKstar','dR_TMinusKstar','dR_TPlusTMinus',
-        'm_kst','invMassB0','invMassTT',
-        'invMassKstarTPlus','invMassKstarTMinus',
-        'pt_B0','pointingCos','transFlightLength',
-        'vertexChi2','eta_B0'
+        'dR_TPlusKstar', 'dR_TMinusKstar', 'dR_TPlusTMinus', 'm_kst', 'invMassB0', 'invMassTT', 'invMassKstarTPlus', 'invMassKstarTMinus', 'pt_B0', 'pointingCos', 'transFlightLength', 'vertexChi2', 'eta_B0'
     ]
-
     best_params = grid_search(root_file, tree_name, feature_branches)
     train_final(root_file, tree_name, feature_branches, best_params)

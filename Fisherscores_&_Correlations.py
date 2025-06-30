@@ -1,10 +1,76 @@
 import ROOT
 import uproot
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+pd.set_option('display.multi_sparse', False)
+os.makedirs("Correlations", exist_ok=True)
 
-file0 = uproot.open("Signal_features.root")
-file1 = uproot.open("Spec_Bckg_features.root")
-file2 = uproot.open("Comb_Bckg_features.root")
+
+def plot_corr_heatmap(
+        corr_mat,
+        title="",
+        filename=None,
+        size=(10, 8),
+        dpi=300,
+        cmap="vlag"
+):
+    # Mask only the strictly upper triangle—keep the diagonal
+    mask = np.triu(np.ones_like(corr_mat, dtype=bool), k=1)
+
+    # Create figure & axes
+    fig, ax = plt.subplots(figsize=size)
+
+    # Draw the heatmap
+    sns.heatmap(
+        corr_mat,
+        mask=mask,
+        annot=True,
+        fmt=".2f",
+        linewidths=.5,
+        cbar_kws={"shrink": .8},
+        cmap=cmap,
+        square=True,
+        ax=ax
+    )
+
+    ax.set_title(title)
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
+
+    # Save or show
+    if filename:
+        outpath = os.path.join("Correlations", filename)
+        fig.savefig(outpath, dpi=dpi, bbox_inches="tight")
+        plt.close(fig)
+        print(f"Saved heatmap to {filename}")
+    else:
+        plt.tight_layout()
+        plt.show()
+
+def rank_correlations(corr_mat, top_n=None, absolute=True):
+    # Mask out the lower triangle and the diagonal
+    mask = np.triu(np.ones_like(corr_mat, dtype=bool), k=1)
+    # Extract the upper triangle values
+    pairs = (
+        corr_mat.where(mask)
+                 .stack()           # turns df into Series with MultiIndex (i, j)
+    )
+    # Sort
+    if absolute:
+        pairs = pairs.reindex(pairs.abs().sort_values(ascending=False).index)
+    else:
+        pairs = pairs.sort_values(ascending=False)
+
+    if top_n is not None:
+        return pairs.head(top_n)
+    return pairs
+
+file0 = uproot.open("Signal_features_triggered.root")
+file1 = uproot.open("Spec_Bckg_features_triggered.root")
+file2 = uproot.open("Comb_Bckg_features_triffered.root")
 tree0 = file0["tree"]
 tree1 = file1["tree"]
 tree2 = file2["tree"]
@@ -30,7 +96,29 @@ corr_matrix_0 = df0.corr()
 corr_matrix_1 = df1.corr()
 corr_matrix_2 = df2.corr()
 
-print(corr_matrix_0)
+for name, cm in {
+    "Signal": corr_matrix_0,
+    "Spec_Background": corr_matrix_1,
+    "Comb_Background": corr_matrix_2
+}.items():
+    print(f"\n=== Top correlations in {name} ===")
+    print(rank_correlations(cm, top_n=10))
+
+plot_corr_heatmap(
+    corr_matrix_0,
+    title="Signal Correlation Matrix",
+    filename="signal_corr.png"
+)
+plot_corr_heatmap(
+    corr_matrix_1,
+    title="Specific Background Correlation Matrix",
+    filename="spec_bkg_corr.png"
+)
+plot_corr_heatmap(
+    corr_matrix_2,
+    title="Combinatorial Background Correlation Matrix",
+    filename="comb_bkg_corr.png"
+)
 
 #compute mean and variance of dataframes
 mean_0 = df0.mean(axis=0)
